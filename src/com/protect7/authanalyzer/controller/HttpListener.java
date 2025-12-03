@@ -18,14 +18,9 @@ public class HttpListener implements IHttpListener, IProxyListener {
 	@Override
 	public void processHttpMessage(int toolFlag, boolean messageIsRequest, IHttpRequestResponse messageInfo) {
 		if(config.isRunning()) {
-			// Обрабатываем ответы всегда
-			if(!messageIsRequest) {
-				if(!isFiltered(toolFlag, messageInfo)) {
-					config.performAuthAnalyzerRequest(messageInfo);
-				}
-			}
-			// Для запросов: обрабатываем если dropOriginal выключен, или если включен и это Proxy
-			else {
+			// Обрабатываем ТОЛЬКО запросы, чтобы избежать дублирования
+			// Ответы уже будут в messageInfo когда обрабатывается запрос с ответом
+			if(messageIsRequest) {
 				// Если dropOriginal включен, обрабатываем только Proxy запросы
 				// Если dropOriginal выключен, обрабатываем все запросы (Scanner, Spider и т.д.)
 				if(!config.isDropOriginal() || (config.isDropOriginal() && toolFlag == IBurpExtenderCallbacks.TOOL_PROXY)) {
@@ -34,6 +29,7 @@ public class HttpListener implements IHttpListener, IProxyListener {
 					}
 				}
 			}
+			// Ответы не обрабатываем отдельно - они уже включены в messageInfo при обработке запроса
 		}
 	}
 
