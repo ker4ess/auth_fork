@@ -74,7 +74,9 @@ public class ConfigurationPanel extends JPanel {
 	private final JButton pauseButton = new JButton();
 	//private final JLabel pendingRequestsLabel = new JLabel("Pending Requests Queue: 0");
 	private final JToggleButton dropOriginalButton = new JToggleButton(DROP_REQUEST_TEXT);
+	private final JButton captureAllButton = new JButton("Capture All Traffic");
 	private final JPanel filterPanel;
+	private ToolSourceFilter toolSourceFilter = null;
 	private final LinkedHashMap<String, SessionPanel> sessionPanelMap = new LinkedHashMap<>();
 	private final String PAUSE_TEXT = "\u23f8";
 	private final String PLAY_TEXT = "\u25b6";
@@ -153,7 +155,7 @@ public class ConfigurationPanel extends JPanel {
 
 		HintCheckBox toolSourceFilterButton = new HintCheckBox("Request Sources");
 		toolSourceFilterButton.setSelected(true);
-		ToolSourceFilter toolSourceFilter = new ToolSourceFilter(filterPanel.getComponentCount(),
+		toolSourceFilter = new ToolSourceFilter(filterPanel.getComponentCount(),
 				"Select which request sources should be analyzed");
 		addToolSourceFilter(toolSourceFilter, toolSourceFilterButton);
 		filterPanel.add(toolSourceFilterButton);
@@ -215,6 +217,8 @@ public class ConfigurationPanel extends JPanel {
 		dropOriginalButton.addActionListener(e -> dropOriginalButtonPressed());
 		dropOriginalButton.setEnabled(false);
 		
+		captureAllButton.addActionListener(e -> captureAllTraffic());
+		
 		JButton settingsButton = new JButton("Settings");
 		settingsButton.addActionListener(e -> new SettingsDialog(this));
 
@@ -235,8 +239,10 @@ public class ConfigurationPanel extends JPanel {
 		c1.gridwidth = 2;
 		startStopButtonPanel.add(dropOriginalButton, c1);
 		c1.gridy = 3;
-		startStopButtonPanel.add(new JLabel(" "), c1);
+		startStopButtonPanel.add(captureAllButton, c1);
 		c1.gridy = 4;
+		startStopButtonPanel.add(new JLabel(" "), c1);
+		c1.gridy = 5;
 		startStopButtonPanel.add(settingsButton, c1);
 		
 		GridBagConstraints c = new GridBagConstraints();
@@ -497,19 +503,14 @@ public class ConfigurationPanel extends JPanel {
 		onOffButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				// Открываем диалог при клике на чекбокс, если он выбран
-				if (onOffButton.isSelected()) {
-					new ToolSourceDialog(ConfigurationPanel.this, filter);
-				}
-			}
-		});
-		// Добавляем обработчик двойного клика для открытия диалога
-		onOffButton.addMouseListener(new java.awt.event.MouseAdapter() {
-			@Override
-			public void mouseClicked(java.awt.event.MouseEvent e) {
-				if (e.getClickCount() == 2 && onOffButton.isSelected()) {
-					new ToolSourceDialog(ConfigurationPanel.this, filter);
-				}
+				// Открываем диалог при клике на чекбокс
+				// Используем SwingUtilities.invokeLater чтобы диалог открылся после изменения состояния чекбокса
+				javax.swing.SwingUtilities.invokeLater(new Runnable() {
+					@Override
+					public void run() {
+						new ToolSourceDialog(ConfigurationPanel.this, filter);
+					}
+				});
 			}
 		});
 	}
@@ -763,6 +764,45 @@ public class ConfigurationPanel extends JPanel {
 	
 	public boolean isPaused() {
 		return pauseButton.getText().equals(PLAY_TEXT);
+	}
+	
+	private void captureAllTraffic() {
+		// Включаем все источники трафика
+		if(toolSourceFilter != null) {
+			toolSourceFilter.setFilterStringLiterals(toolSourceFilter.getAllAvailableTools().toArray(new String[0]));
+			toolSourceFilter.setIsSelected(true);
+			toolSourceFilter.updateHint();
+		}
+		
+		// Отключаем фильтры, которые ограничивают трафик
+		for(int i = 0; i < config.getRequestFilterList().size(); i++) {
+			RequestFilter filter = config.getRequestFilterAt(i);
+			// Отключаем "Only In Scope" и "Only Proxy Traffic"
+			if(filter instanceof InScopeFilter || filter instanceof OnlyProxyFilter) {
+				filter.setIsSelected(false);
+			}
+		}
+		
+		// Проверяем, есть ли сессия
+		if(sessionPanelMap.size() == 0) {
+			JOptionPane.showMessageDialog(this, "Please create a session first!", "No Session", JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		
+		// Запускаем анализатор, если он не запущен
+		if(!config.isRunning() && !pauseButton.getText().equals(PLAY_TEXT)) {
+			startStopButtonPressed();
+		} else if(pauseButton.getText().equals(PLAY_TEXT)) {
+			// Если на паузе, возобновляем
+			pauseButtonPressed();
+		}
+		
+		JOptionPane.showMessageDialog(this, 
+			"All traffic capture enabled!\n\n" +
+			"All request sources are now active.\n" +
+			"Filters 'Only In Scope' and 'Only Proxy Traffic' have been disabled.",
+			"Capture All Traffic", 
+			JOptionPane.INFORMATION_MESSAGE);
 	}
 
 	private String[] getInputArray(Component parentFrame, String message, String value) {
