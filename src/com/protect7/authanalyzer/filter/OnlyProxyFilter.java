@@ -13,20 +13,18 @@ public class OnlyProxyFilter extends RequestFilter {
 	@Override
 	public boolean filterRequest(IBurpExtenderCallbacks callbacks, int toolFlag, IRequestInfo requestInfo, IResponseInfo responseInfo) {
 		if(onOffButton.isSelected()) {
+			// Если фильтр включен - разрешаем только Proxy, остальное фильтруем
 			if(toolFlag == IBurpExtenderCallbacks.TOOL_PROXY) {
-				return false;
+				return false; // Не фильтруем Proxy
 			}
-			else if(toolFlag == IBurpExtenderCallbacks.TOOL_REPEATER) {
-				incrementFiltered();
-			}
+			// Все остальное фильтруем
+			incrementFiltered();
+			return true;
 		}
 		else {
-			//Only allow Repeater beside of Proxy
-			if(toolFlag == IBurpExtenderCallbacks.TOOL_REPEATER || toolFlag == IBurpExtenderCallbacks.TOOL_PROXY) {
-				return false;
-			}
+			// Если фильтр выключен - не фильтруем ничего (разрешаем все)
+			return false;
 		}
-		return true;
 	}
 
 	@Override

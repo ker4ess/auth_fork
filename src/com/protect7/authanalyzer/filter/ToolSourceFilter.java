@@ -1,6 +1,5 @@
 package com.protect7.authanalyzer.filter;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import com.protect7.authanalyzer.util.GenericHelper;
@@ -111,4 +110,3 @@ public class ToolSourceFilter extends RequestFilter {
 		return true;
 	}
 }
-
