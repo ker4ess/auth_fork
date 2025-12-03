@@ -39,6 +39,7 @@ import com.protect7.authanalyzer.entities.TokenBuilder;
 import com.protect7.authanalyzer.entities.TokenLocation;
 import com.protect7.authanalyzer.filter.FileTypeFilter;
 import com.protect7.authanalyzer.filter.InScopeFilter;
+import com.protect7.authanalyzer.filter.IncludeScannerSpiderFilter;
 import com.protect7.authanalyzer.filter.MethodFilter;
 import com.protect7.authanalyzer.filter.OnlyProxyFilter;
 import com.protect7.authanalyzer.filter.PathFilter;
@@ -152,6 +153,14 @@ public class ConfigurationPanel extends JPanel {
 						"Analyze only proxy traffic. Unselect to analyze repeater and proxy traffic"),
 				onlyProxyButton, "");
 		filterPanel.add(onlyProxyButton);
+
+		HintCheckBox includeScannerSpiderButton = new HintCheckBox("Include Scanner & Spider");
+		includeScannerSpiderButton.setSelected(false);
+		addFilter(
+				new IncludeScannerSpiderFilter(filterPanel.getComponentCount(),
+						"Enable to capture traffic from Scanner and Spider/Crawler"),
+				includeScannerSpiderButton, "");
+		filterPanel.add(includeScannerSpiderButton);
 
 		HintCheckBox toolSourceFilterButton = new HintCheckBox("Request Sources");
 		toolSourceFilterButton.setSelected(true);

@@ -82,7 +82,7 @@ public class ToolSourceFilter extends RequestFilter {
 			return TOOL_TARGET;
 		} else if(toolFlag == IBurpExtenderCallbacks.TOOL_COMPARER) {
 			return TOOL_COMPARER;
-		}
+! 		}
 		return null;
 	}
 	
