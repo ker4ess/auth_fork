@@ -19,8 +19,6 @@ public class ToolSourceFilter extends RequestFilter {
 	private static final String TOOL_EXTENDER = "Extender";
 	private static final String TOOL_TARGET = "Target";
 	private static final String TOOL_COMPARER = "Comparer";
-	private static final String TOOL_COLLABORATOR = "Collaborator";
-	private static final String TOOL_LOGGER = "Logger";
 	
 	public ToolSourceFilter(int filterIndex, String description) {
 		super(filterIndex, description);
@@ -28,7 +26,7 @@ public class ToolSourceFilter extends RequestFilter {
 		setFilterStringLiterals(new String[]{
 			TOOL_PROXY, TOOL_REPEATER, TOOL_INTRUDER, TOOL_SCANNER, 
 			TOOL_SPIDER, TOOL_SEQUENCER, TOOL_EXTENDER, TOOL_TARGET,
-			TOOL_COMPARER, TOOL_COLLABORATOR, TOOL_LOGGER
+			TOOL_COMPARER
 		});
 	}
 	
@@ -84,10 +82,6 @@ public class ToolSourceFilter extends RequestFilter {
 			return TOOL_TARGET;
 		} else if(toolFlag == IBurpExtenderCallbacks.TOOL_COMPARER) {
 			return TOOL_COMPARER;
-		} else if(toolFlag == IBurpExtenderCallbacks.TOOL_COLLABORATOR) {
-			return TOOL_COLLABORATOR;
-		} else if(toolFlag == IBurpExtenderCallbacks.TOOL_LOGGER) {
-			return TOOL_LOGGER;
 		}
 		return null;
 	}
@@ -108,7 +102,7 @@ public class ToolSourceFilter extends RequestFilter {
 		return Arrays.asList(
 			TOOL_PROXY, TOOL_REPEATER, TOOL_INTRUDER, TOOL_SCANNER,
 			TOOL_SPIDER, TOOL_SEQUENCER, TOOL_EXTENDER, TOOL_TARGET,
-			TOOL_COMPARER, TOOL_COLLABORATOR, TOOL_LOGGER
+			TOOL_COMPARER
 		);
 	}
 

@@ -98,9 +98,7 @@ public class ToolSourceDialog extends JDialog {
 		}
 		filter.setFilterStringLiterals(selectedTools.toArray(new String[0]));
 		// Обновляем подсказку после сохранения
-		if(filter.onOffButton != null) {
-			filter.onOffButton.setHint(filter.getInfoText());
-		}
+		filter.updateHint();
 		dispose();
 	}
 }

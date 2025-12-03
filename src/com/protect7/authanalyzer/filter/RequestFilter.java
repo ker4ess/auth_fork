@@ -62,6 +62,12 @@ public abstract class RequestFilter {
 		onOffButton.setSelected(selected);
 	}
 	
+	public void updateHint() {
+		if(onOffButton != null) {
+			onOffButton.setHint(getInfoText());
+		}
+	}
+	
 	public String toJson() {
 		String json = "{\"filterIndex\":"+filterIndex+",\"isSelected\":"+onOffButton.isSelected();
 		if(!hasStringLiterals()) {
