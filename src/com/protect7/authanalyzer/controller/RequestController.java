@@ -55,6 +55,10 @@ public class RequestController {
 				originalResponseInfo = BurpExtender.callbacks.getHelpers()
 				.analyzeResponse(originalRequestResponse.getResponse());
 			}
+			
+			// КРИТИЧЕСКИ ВАЖНО: Обрабатываем сессии для создания дубликатов.
+			// Даже если список сессий пуст, оригинальный запрос ВСЕГДА будет сохранен в конце метода.
+			// Цикл может быть пустым (если нет сессий), но это не влияет на сохранение оригинального запроса.
 			for (Session session : CurrentConfig.getCurrentConfig().getSessions()) {
 				boolean isFiltered = false;
 				if(!session.getStatusPanel().isRunning()) {
@@ -146,6 +150,10 @@ public class RequestController {
 					}
 				}
 			}
+			
+			// КРИТИЧЕСКИ ВАЖНО: Оригинальный запрос ВСЕГДА сохраняется в таблице,
+			// независимо от количества сессий, фильтрации сессий или любых других условий.
+			// Это гарантирует, что пользователь всегда видит оригинальный запрос от Scanner/Spider/Proxy.
 			String url = "";
 			if(originalRequestInfo.getUrl().getQuery() == null) {
 				url = originalRequestInfo.getUrl().getPath();

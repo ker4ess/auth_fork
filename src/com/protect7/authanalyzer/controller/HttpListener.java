@@ -30,11 +30,18 @@ public class HttpListener implements IHttpListener, IProxyListener {
 			if(messageIsRequest) {
 				// ЛОГИКА ОБРАБОТКИ ЗАПРОСОВ:
 				// 1. TOOL_EXTENDER - уже отфильтровано выше (игнорируем)
-				// 2. Если dropOriginal выключен - обрабатываем ВСЕ запросы (Scanner, Spider, Proxy и т.д.)
-				// 3. Если dropOriginal включен - обрабатываем ТОЛЬКО Proxy запросы
-				//    (Scanner/Spider в этом случае не обрабатываются, т.к. они не проходят через Proxy)
+				// 2. Scanner и Spider - ВСЕГДА обрабатываем (независимо от dropOriginal)
+				//    Это критически важно, т.к. пользователь должен видеть оригинальные запросы от Scanner/Spider
+				// 3. Если dropOriginal выключен - обрабатываем ВСЕ запросы (включая Proxy)
+				// 4. Если dropOriginal включен - обрабатываем только Proxy (для Proxy dropOriginal работает)
 				boolean shouldProcess = false;
-				if(!config.isDropOriginal()) {
+				
+				// Scanner и Spider ВСЕГДА обрабатываем (независимо от dropOriginal)
+				if(toolFlag == IBurpExtenderCallbacks.TOOL_SCANNER || toolFlag == IBurpExtenderCallbacks.TOOL_SPIDER) {
+					shouldProcess = true;
+				}
+				// Для остальных инструментов проверяем dropOriginal
+				else if(!config.isDropOriginal()) {
 					// dropOriginal выключен - обрабатываем все запросы от любых инструментов
 					shouldProcess = true;
 				} else {
