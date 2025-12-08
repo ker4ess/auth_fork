@@ -25,9 +25,11 @@ public class HttpListener implements IHttpListener, IProxyListener {
 				return; // НЕ обрабатываем запросы, созданные расширением
 			}
 			
-			// Обрабатываем ТОЛЬКО запросы, чтобы избежать дублирования
-			// Ответы уже будут в messageInfo когда обрабатывается запрос с ответом
-			if(messageIsRequest) {
+			// КРИТИЧЕСКИ ВАЖНО: Обрабатываем ТОЛЬКО когда приходит RESPONSE (messageIsRequest = false),
+			// потому что для сравнения оригинального и модифицированного запроса нам нужен оригинальный response!
+			// Когда приходит response, в messageInfo уже есть и request и response.
+			// Если обрабатывать при messageIsRequest = true, то response еще нет, и сравнение невозможно.
+			if(!messageIsRequest) {
 				// ЛОГИКА ОБРАБОТКИ ЗАПРОСОВ:
 				// 1. TOOL_EXTENDER - уже отфильтровано выше (игнорируем)
 				// 2. Scanner и Spider - ВСЕГДА обрабатываем (независимо от dropOriginal)
@@ -55,18 +57,28 @@ public class HttpListener implements IHttpListener, IProxyListener {
 					config.performAuthAnalyzerRequest(messageInfo);
 				}
 			}
-			// Ответы не обрабатываем отдельно - они уже включены в messageInfo при обработке запроса
 		}
 	}
 
 	@Override
 	public void processProxyMessage(boolean messageIsRequest, IInterceptedProxyMessage message) {
-		if(config.isDropOriginal() && messageIsRequest) {
-			if(!isFiltered(IBurpExtenderCallbacks.TOOL_PROXY, message.getMessageInfo())) {
-				processHttpMessage(IBurpExtenderCallbacks.TOOL_PROXY, true, message.getMessageInfo());
-				message.setInterceptAction(IInterceptedProxyMessage.ACTION_DROP);
-			}
-		}
+		// КРИТИЧЕСКИ ВАЖНО: dropOriginal должен дропать запрос, НО нам нужен response для сравнения!
+		// ПРОБЛЕМА: Если мы дропаем запрос здесь (когда messageIsRequest = true), то response не придет,
+		// и мы не сможем сравнить оригинальный и модифицированный response в RequestController.
+		//
+		// РЕШЕНИЕ: НЕ дропать запрос в processProxyMessage, если dropOriginal включен.
+		// Вместо этого обрабатывать его в processHttpMessage когда придет response (messageIsRequest = false).
+		// dropOriginal в этом случае означает, что мы обрабатываем запрос через расширение,
+		// а не через обычный Proxy flow. Оригинальный запрос все равно пройдет через Proxy,
+		// получит response, и затем будет обработан расширением для сравнения с модифицированными запросами.
+		//
+		// ВАЖНО: Оригинальный запрос НЕ дропается, он проходит через Proxy нормально,
+		// получает response, и затем обрабатывается расширением для сравнения.
+		// Это правильное поведение, т.к. нам нужен оригинальный response для сравнения.
+		//
+		// ПРИМЕЧАНИЕ: Если пользователь хочет дропать оригинальный запрос в Proxy истории,
+		// это можно сделать через другие механизмы Burp, но не через ACTION_DROP здесь,
+		// т.к. это помешает получению response для сравнения.
 	}
 	
 	private boolean isFiltered(int toolFlag, IHttpRequestResponse messageInfo) {
