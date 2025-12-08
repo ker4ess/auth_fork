@@ -28,6 +28,20 @@ import burp.IResponseInfo;
 
 public class RequestController {
 
+	/**
+	 * Анализирует оригинальный запрос и создает дубликаты для каждой активной сессии.
+	 * 
+	 * КРИТИЧЕСКИ ВАЖНО: Этот метод должен вызываться ТОЛЬКО ОДИН РАЗ на каждый оригинальный запрос
+	 * от Scanner/Spider/Proxy. Метод сам создает N дубликатов (где N = количество активных сессий).
+	 * 
+	 * ЛОГИКА ДУБЛИРОВАНИЯ:
+	 * - 1 оригинальный запрос → N дубликатов (N = количество активных сессий)
+	 * - Каждый дубликат использует параметры своей сессии (токены, заголовки и т.д.)
+	 * - Дубликаты создаются через makeHttpRequest, который генерирует запросы с toolFlag = TOOL_EXTENDER
+	 * - HttpListener игнорирует TOOL_EXTENDER запросы, предотвращая рекурсивное дублирование
+	 * 
+	 * @param originalRequestResponse Оригинальный запрос от Scanner/Spider/Proxy (НЕ от расширения)
+	 */
 	public void analyze(IHttpRequestResponse originalRequestResponse) {
 		
 		// Fail-Safe - Check if messageInfo can be processed
@@ -67,7 +81,9 @@ public class RequestController {
 				} 
 				if(!isFiltered) {
 				
-					// Handle Session
+					// Handle Session - создаем модифицированный запрос для каждой сессии
+					// ВАЖНО: Каждый оригинальный запрос должен быть продублирован ровно N раз,
+					// где N = количество активных сессий. Каждый дубликат использует параметры своей сессии.
 					TokenPriority tokenPriority = new TokenPriority();
 					byte[] modifiedRequest = RequestModifHelper.getModifiedRequest(originalRequestResponse.getRequest(), session, tokenPriority);
 					// Analyze modifiedRequest
@@ -79,6 +95,10 @@ public class RequestController {
 					byte[] message = BurpExtender.callbacks.getHelpers().buildHttpMessage(modifiedHeaders, modifiedMessageBody);
 
 					// Perform modified request
+					// КРИТИЧЕСКИ ВАЖНО: makeHttpRequest создает запрос с toolFlag = TOOL_EXTENDER.
+					// HttpListener игнорирует такие запросы, чтобы предотвратить рекурсивное дублирование.
+					// Без этой защиты каждый makeHttpRequest вызывал бы HttpListener снова, создавая
+					// экспоненциальный рост запросов (1 → N → N*N → N*N*N и т.д.)
 					IHttpRequestResponse sessionRequestResponse = BurpExtender.callbacks
 							.makeHttpRequest(originalRequestResponse.getHttpService(), message);
 				
