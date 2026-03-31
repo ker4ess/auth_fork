@@ -11,7 +11,6 @@ import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import com.protect7.authanalyzer.entities.MatchAndReplace;
 import com.protect7.authanalyzer.entities.Session;
 import com.protect7.authanalyzer.entities.Token;
@@ -258,30 +257,23 @@ public class StatusPanel extends JPanel{
 	}
 	
 	public void incrementAmountOfFitleredRequests() {
-		SwingUtilities.invokeLater(() -> {
-			amountOfFilteredRequests++;
-			amountOfFilteredRequestsLabel.setText("Amount of Filtered Requests: " + amountOfFilteredRequests);
-			GenericHelper.uiUpdateAnimation(amountOfFilteredRequestsLabel, Color.RED);
-		});
+		amountOfFilteredRequests++;
+		amountOfFilteredRequestsLabel.setText("Amount of Filtered Requests: " + amountOfFilteredRequests);
+		GenericHelper.uiUpdateAnimation(amountOfFilteredRequestsLabel, Color.RED);
 	}
 	
 	public void updateTokenStatus(Token token) {
-		SwingUtilities.invokeLater(() -> {
-			JLabel tokenLabel = tokenLabelMap.get(token.getName());
-			if (tokenLabel == null) {
-				return;
+		JLabel tokenLabel = tokenLabelMap.get(token.getName());
+		tokenLabel.putClientProperty("html.disable", null);
+		tokenLabel.setText(getTokenText(token));
+		GenericHelper.uiUpdateAnimation(tokenLabel, new Color(0, 153, 0));
+		if(token.getValue() != null) {
+			if(refreshButtonMap.get(token.getName()) != null) {
+				refreshButtonMap.get(token.getName()).setEnabled(true);
 			}
-			tokenLabel.putClientProperty("html.disable", null);
-			tokenLabel.setText(getTokenText(token));
-			GenericHelper.uiUpdateAnimation(tokenLabel, new Color(0, 153, 0));
-			if(token.getValue() != null) {
-				if(refreshButtonMap.get(token.getName()) != null) {
-					refreshButtonMap.get(token.getName()).setEnabled(true);
-				}
-				if(eraseButtonMap.get(token.getName()) != null) {
-					eraseButtonMap.get(token.getName()).setEnabled(true);
-				}
+			if(eraseButtonMap.get(token.getName()) != null) {
+				eraseButtonMap.get(token.getName()).setEnabled(true);
 			}
-		});
+		}
 	}
 }
