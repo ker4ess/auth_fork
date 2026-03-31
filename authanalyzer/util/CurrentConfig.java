@@ -1,8 +1,11 @@
 package com.protect7.authanalyzer.util;
 
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import com.protect7.authanalyzer.controller.RequestController;
 import com.protect7.authanalyzer.entities.Session;
 import com.protect7.authanalyzer.entities.Token;
@@ -19,7 +22,8 @@ public class CurrentConfig {
 	//private final String[] patternsDynamic = {"viewstate", "eventvalidation"};
 	private final int POOL_SIZE_MIN = 1; 
 	private final RequestController requestController = new RequestController();
-	private ThreadPoolExecutor analyzerThreadExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(POOL_SIZE_MIN);
+	private ThreadPoolExecutor analyzerThreadExecutor = createAnalyzerExecutor(POOL_SIZE_MIN, 500);
+	private volatile long lastQueueFullLogMs = 0L;
 	private ArrayList<RequestFilter> requestFilterList = new ArrayList<>();
 	private ArrayList<Session> sessions = new ArrayList<>();
 	private RequestTableModel tableModel = null;
@@ -33,23 +37,47 @@ public class CurrentConfig {
 
 	private CurrentConfig() {
 	}
+
+	private static ThreadPoolExecutor createAnalyzerExecutor(int threads, int queueCapacity) {
+		int cap = Math.max(1, queueCapacity);
+		int t = Math.max(1, threads);
+		AtomicInteger seq = new AtomicInteger(1);
+		return new ThreadPoolExecutor(t, t, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(cap), r -> {
+			Thread th = new Thread(r, "AuthAnalyzer-" + seq.getAndIncrement());
+			th.setDaemon(true);
+			return th;
+		}, new ThreadPoolExecutor.AbortPolicy());
+	}
 	
 	public void performAuthAnalyzerRequest(IHttpRequestResponse messageInfo) {
-		analyzerThreadExecutor.execute(new Runnable() {				
+		Runnable task = new Runnable() {				
 			@Override
 			public void run() {
 				BurpExtender.mainPanel.getCenterPanel().updateAmountOfPendingRequests(
-						analyzerThreadExecutor.getQueue().size());
+						analyzerThreadExecutor.getQueue().size() + analyzerThreadExecutor.getActiveCount());
 				getRequestController().analyze(messageInfo);
 				try {
 					Thread.sleep(delayBetweenRequestsInMilliseconds);
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					Thread.currentThread().interrupt();
 				}
+				BurpExtender.mainPanel.getCenterPanel().updateAmountOfPendingRequests(
+						analyzerThreadExecutor.getQueue().size() + analyzerThreadExecutor.getActiveCount());
 			}
-		});
-		BurpExtender.mainPanel.getCenterPanel().updateAmountOfPendingRequests(
-				analyzerThreadExecutor.getQueue().size());
+		};
+		try {
+			analyzerThreadExecutor.execute(task);
+			BurpExtender.mainPanel.getCenterPanel().updateAmountOfPendingRequests(
+					analyzerThreadExecutor.getQueue().size() + analyzerThreadExecutor.getActiveCount());
+		} catch (RejectedExecutionException e) {
+			long now = System.currentTimeMillis();
+			if (now - lastQueueFullLogMs > 5000L) {
+				lastQueueFullLogMs = now;
+				BurpExtender.callbacks.printError(
+						"Auth Analyzer: analysis queue is full; dropping traffic until the backlog shrinks. "
+								+ "Increase \"" + Setting.Item.ANALYSIS_QUEUE_CAPACITY.getDescription() + "\" in settings if needed.");
+			}
+		}
 	}
 	
 	public static CurrentConfig getCurrentConfig(){
@@ -70,13 +98,19 @@ public class CurrentConfig {
 			respectResponseCodeForSimilarStatus = Setting.getValueAsBoolean(Setting.Item.STATUS_SIMILAR_RESPONSE_CODE);
 			deviationForSimilarStatus = Setting.getValueAsInteger(Setting.Item.STATUS_SIMILAR_RESPONSE_LENGTH);
 			delayBetweenRequestsInMilliseconds = Setting.getValueAsInteger(Setting.Item.DELAY_BETWEEN_REQUESTS);
+			int queueCapacity = Setting.getValueAsInteger(Setting.Item.ANALYSIS_QUEUE_CAPACITY);
+			if (queueCapacity < 1) {
+				queueCapacity = 500;
+			}
 			if(hasPromptForInput() && Setting.getValueAsBoolean(Setting.Item.ONLY_ONE_THREAD_IF_PROMT_FOR_INPUT)) {
-				//Set POOL Size to 1 --> if prompt for input dialog appears no further requests will be repeated until dialog is closed
-				analyzerThreadExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(POOL_SIZE_MIN);
+				analyzerThreadExecutor = createAnalyzerExecutor(POOL_SIZE_MIN, queueCapacity);
 			}
 			else {
 				int numberOfThreads = Setting.getValueAsInteger(Setting.Item.NUMBER_OF_THREADS);
-				analyzerThreadExecutor = (ThreadPoolExecutor) Executors.newFixedThreadPool(numberOfThreads);
+				if (numberOfThreads < 1) {
+					numberOfThreads = POOL_SIZE_MIN;
+				}
+				analyzerThreadExecutor = createAnalyzerExecutor(numberOfThreads, queueCapacity);
 			}
 		}
 		else {

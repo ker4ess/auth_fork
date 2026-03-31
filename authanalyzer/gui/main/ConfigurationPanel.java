@@ -39,13 +39,16 @@ import com.protect7.authanalyzer.entities.TokenBuilder;
 import com.protect7.authanalyzer.entities.TokenLocation;
 import com.protect7.authanalyzer.filter.FileTypeFilter;
 import com.protect7.authanalyzer.filter.InScopeFilter;
+import com.protect7.authanalyzer.filter.IncludeScannerSpiderFilter;
 import com.protect7.authanalyzer.filter.MethodFilter;
 import com.protect7.authanalyzer.filter.OnlyProxyFilter;
 import com.protect7.authanalyzer.filter.PathFilter;
 import com.protect7.authanalyzer.filter.QueryFilter;
 import com.protect7.authanalyzer.filter.RequestFilter;
 import com.protect7.authanalyzer.filter.StatusCodeFilter;
+import com.protect7.authanalyzer.filter.ToolSourceFilter;
 import com.protect7.authanalyzer.gui.dialog.SettingsDialog;
+import com.protect7.authanalyzer.gui.dialog.ToolSourceDialog;
 import com.protect7.authanalyzer.gui.entity.SessionPanel;
 import com.protect7.authanalyzer.gui.entity.TokenPanel;
 import com.protect7.authanalyzer.gui.listener.CloneSessionListener;
@@ -72,7 +75,9 @@ public class ConfigurationPanel extends JPanel {
 	private final JButton pauseButton = new JButton();
 	//private final JLabel pendingRequestsLabel = new JLabel("Pending Requests Queue: 0");
 	private final JToggleButton dropOriginalButton = new JToggleButton(DROP_REQUEST_TEXT);
+	private final JButton captureAllButton = new JButton("Capture All Traffic");
 	private final JPanel filterPanel;
+	private ToolSourceFilter toolSourceFilter = null;
 	private final LinkedHashMap<String, SessionPanel> sessionPanelMap = new LinkedHashMap<>();
 	private final String PAUSE_TEXT = "\u23f8";
 	private final String PLAY_TEXT = "\u25b6";
@@ -149,6 +154,21 @@ public class ConfigurationPanel extends JPanel {
 				onlyProxyButton, "");
 		filterPanel.add(onlyProxyButton);
 
+		HintCheckBox includeScannerSpiderButton = new HintCheckBox("Include Scanner & Spider");
+		includeScannerSpiderButton.setSelected(false);
+		addFilter(
+				new IncludeScannerSpiderFilter(filterPanel.getComponentCount(),
+						"Enable to capture traffic from Scanner and Spider/Crawler"),
+				includeScannerSpiderButton, "");
+		filterPanel.add(includeScannerSpiderButton);
+
+		HintCheckBox toolSourceFilterButton = new HintCheckBox("Request Sources");
+		toolSourceFilterButton.setSelected(true);
+		toolSourceFilter = new ToolSourceFilter(filterPanel.getComponentCount(),
+				"Select which request sources should be analyzed");
+		addToolSourceFilter(toolSourceFilter, toolSourceFilterButton);
+		filterPanel.add(toolSourceFilterButton);
+
 		HintCheckBox fileTypeFilterButton = new HintCheckBox("Exclude Filetypes");
 		fileTypeFilterButton.setSelected(true);
 		addFilter(new FileTypeFilter(filterPanel.getComponentCount(), "Excludes every specified filetype"),
@@ -206,6 +226,8 @@ public class ConfigurationPanel extends JPanel {
 		dropOriginalButton.addActionListener(e -> dropOriginalButtonPressed());
 		dropOriginalButton.setEnabled(false);
 		
+		captureAllButton.addActionListener(e -> captureAllTraffic());
+		
 		JButton settingsButton = new JButton("Settings");
 		settingsButton.addActionListener(e -> new SettingsDialog(this));
 
@@ -226,8 +248,10 @@ public class ConfigurationPanel extends JPanel {
 		c1.gridwidth = 2;
 		startStopButtonPanel.add(dropOriginalButton, c1);
 		c1.gridy = 3;
-		startStopButtonPanel.add(new JLabel(" "), c1);
+		startStopButtonPanel.add(captureAllButton, c1);
 		c1.gridy = 4;
+		startStopButtonPanel.add(new JLabel(" "), c1);
+		c1.gridy = 5;
 		startStopButtonPanel.add(settingsButton, c1);
 		
 		GridBagConstraints c = new GridBagConstraints();
@@ -481,6 +505,24 @@ public class ConfigurationPanel extends JPanel {
 			}
 		});
 	}
+	
+	private void addToolSourceFilter(ToolSourceFilter filter, HintCheckBox onOffButton) {
+		config.addRequestFilter(filter);
+		filter.registerOnOffButton(onOffButton);
+		onOffButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				// Открываем диалог при клике на чекбокс
+				// Используем SwingUtilities.invokeLater чтобы диалог открылся после изменения состояния чекбокса
+				javax.swing.SwingUtilities.invokeLater(new Runnable() {
+					@Override
+					public void run() {
+						new ToolSourceDialog(ConfigurationPanel.this, filter);
+					}
+				});
+			}
+		});
+	}
 
 	public void startStopButtonPressed() {
 		if (sessionPanelMap.size() == 0) {
@@ -731,6 +773,45 @@ public class ConfigurationPanel extends JPanel {
 	
 	public boolean isPaused() {
 		return pauseButton.getText().equals(PLAY_TEXT);
+	}
+	
+	private void captureAllTraffic() {
+		// Включаем все источники трафика
+		if(toolSourceFilter != null) {
+			toolSourceFilter.setFilterStringLiterals(toolSourceFilter.getAllAvailableTools().toArray(new String[0]));
+			toolSourceFilter.setIsSelected(true);
+			toolSourceFilter.updateHint();
+		}
+		
+		// Отключаем фильтры, которые ограничивают трафик
+		for(int i = 0; i < config.getRequestFilterList().size(); i++) {
+			RequestFilter filter = config.getRequestFilterAt(i);
+			// Отключаем "Only In Scope" и "Only Proxy Traffic"
+			if(filter instanceof InScopeFilter || filter instanceof OnlyProxyFilter) {
+				filter.setIsSelected(false);
+			}
+		}
+		
+		// Проверяем, есть ли сессия
+		if(sessionPanelMap.size() == 0) {
+			JOptionPane.showMessageDialog(this, "Please create a session first!", "No Session", JOptionPane.WARNING_MESSAGE);
+			return;
+		}
+		
+		// Запускаем анализатор, если он не запущен
+		if(!config.isRunning() && !pauseButton.getText().equals(PLAY_TEXT)) {
+			startStopButtonPressed();
+		} else if(pauseButton.getText().equals(PLAY_TEXT)) {
+			// Если на паузе, возобновляем
+			pauseButtonPressed();
+		}
+		
+		JOptionPane.showMessageDialog(this, 
+			"All traffic capture enabled!\n\n" +
+			"All request sources are now active.\n" +
+			"Filters 'Only In Scope' and 'Only Proxy Traffic' have been disabled.",
+			"Capture All Traffic", 
+			JOptionPane.INFORMATION_MESSAGE);
 	}
 
 	private String[] getInputArray(Component parentFrame, String message, String value) {

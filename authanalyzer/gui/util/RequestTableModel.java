@@ -14,6 +14,7 @@ public class RequestTableModel extends AbstractTableModel {
 	private final ArrayList<OriginalRequestResponse> originalRequestResponseList = new ArrayList<OriginalRequestResponse>();
 	private final CurrentConfig config = CurrentConfig.getCurrentConfig();
 	private final int STATIC_COLUMN_COUNT = 7;
+	private boolean tableRefreshScheduled = false;
 	
 	public ArrayList<OriginalRequestResponse> getOriginalRequestResponseList() {
 		return originalRequestResponseList;
@@ -21,13 +22,19 @@ public class RequestTableModel extends AbstractTableModel {
 	
 	public synchronized void addNewRequestResponse(OriginalRequestResponse requestResponse) {
 		originalRequestResponseList.add(requestResponse);
-		final int index = originalRequestResponseList.size()-1;
-		SwingUtilities.invokeLater(new Runnable() {
-			
-			@Override
-			public void run() {
-				fireTableRowsInserted(index, index);
+		scheduleTableRefreshCoalesced();
+	}
+
+	private void scheduleTableRefreshCoalesced() {
+		if (tableRefreshScheduled) {
+			return;
+		}
+		tableRefreshScheduled = true;
+		SwingUtilities.invokeLater(() -> {
+			synchronized (RequestTableModel.this) {
+				tableRefreshScheduled = false;
 			}
+			fireTableDataChanged();
 		});
 	}
 	
@@ -40,19 +47,15 @@ public class RequestTableModel extends AbstractTableModel {
 		return false;
 	}
 	
-	public void deleteRequestResponse(OriginalRequestResponse requestResponse) {
+	public synchronized void deleteRequestResponse(OriginalRequestResponse requestResponse) {
 		originalRequestResponseList.remove(requestResponse);
-		SwingUtilities.invokeLater(new Runnable() {			
-			@Override
-			public void run() {
-				fireTableDataChanged();
-			}
-		});
+		scheduleTableRefreshCoalesced();
 	}
 	
-	public void clearRequestMap() {
+	public synchronized void clearRequestMap() {
 		originalRequestResponseList.clear();
-		fireTableDataChanged();
+		tableRefreshScheduled = false;
+		SwingUtilities.invokeLater(this::fireTableDataChanged);
 	}
 	
 	public OriginalRequestResponse getOriginalRequestResponse(int listIndex) {

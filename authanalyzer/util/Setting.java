@@ -68,6 +68,8 @@ public class Setting {
 		AUTOSET_PARAM_DYNAMIC_PATTERNS("viewstate,eventvalidation,requestverificationtoken", Type.ARRAY,
 				"Dynamic Patterns (for Automatically Set Parameters)", null),
 		NUMBER_OF_THREADS("5", Type.INTEGER, "Number of Threads (for Request Processing)", new Range(1,50)),
+		ANALYSIS_QUEUE_CAPACITY("500", Type.INTEGER,
+				"Max pending items in analysis queue (backpressure; avoids freezing when traffic is high)", new Range(10, 50000)),
 		DELAY_BETWEEN_REQUESTS("0", Type.INTEGER, "Delay between Requests in Milliseconds", new Range(0,60000)),
 		ONLY_ONE_THREAD_IF_PROMT_FOR_INPUT("true", Type.BOOLEAN, 
 				"One Thread if a Prompt for Input Parameter is present", null),

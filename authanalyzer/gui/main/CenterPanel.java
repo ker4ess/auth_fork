@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -474,14 +475,17 @@ public class CenterPanel extends JPanel {
 	public void clearTablePressed() {
 		clearTableButton.setIcon(loaderImageIcon);
 		if (config.isRunning()) {
-			config.getAnalyzerThreadExecutor().execute(new Runnable() {
-
-				@Override
-				public void run() {
+			try {
+				config.getAnalyzerThreadExecutor().execute(() -> SwingUtilities.invokeLater(() -> {
 					clearTable();
 					clearTableButton.setIcon(null);
-				}
-			});
+				}));
+			} catch (RejectedExecutionException e) {
+				SwingUtilities.invokeLater(() -> {
+					clearTable();
+					clearTableButton.setIcon(null);
+				});
+			}
 		} else {
 			clearTable();
 			clearTableButton.setIcon(null);
@@ -543,14 +547,26 @@ public class CenterPanel extends JPanel {
 		tablePanel.revalidate();
 	}
 	
+	private volatile int latestPendingRequestsCount = -1;
+	private volatile boolean pendingRequestsLabelRefreshScheduled = false;
+
 	public void updateAmountOfPendingRequests(int amountOfPendingRequests) {
-		if(amountOfPendingRequests == 0) {
-			pendingRequestsLabel.setVisible(false);
+		latestPendingRequestsCount = amountOfPendingRequests;
+		if (pendingRequestsLabelRefreshScheduled) {
+			return;
 		}
-		else {
-			pendingRequestsLabel.setVisible(true);
-			pendingRequestsLabel.setText("Pending Requests Queue: " + amountOfPendingRequests);
-		}
+		pendingRequestsLabelRefreshScheduled = true;
+		SwingUtilities.invokeLater(() -> {
+			pendingRequestsLabelRefreshScheduled = false;
+			int n = latestPendingRequestsCount;
+			if(n == 0) {
+				pendingRequestsLabel.setVisible(false);
+			}
+			else {
+				pendingRequestsLabel.setVisible(true);
+				pendingRequestsLabel.setText("Pending Requests Queue: " + n);
+			}
+		});
 	} 
 	
 	private void changeRequestResponseView(boolean force) {
